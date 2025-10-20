@@ -107,7 +107,7 @@
           tbody.appendChild(tr);
         });
         const total=rows.reduce((s,[,n])=>s+n,0);
-        document.getElementById('footnote').textContent=`Total: ${total.toLocaleString()} • Weeks stored: ${data.length}`;
+        document.getElementById('footnote').textContent=`Total: ${total.toLocaleString()}`;
 
         const highlights = new Set(rows.map(([n])=>DISPLAY_NAME_MAP[n]).filter(Boolean));
         await drawMap(highlights);
