@@ -37,7 +37,6 @@
 <body>
   <!-- 1) LOGO -->
   <div class="media-card">
-    <!-- If your file name has spaces, encode them as %20 or rename it -->
     <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg" alt="Candida Campaign visual" class="media-img">
   </div>
 
@@ -75,13 +74,10 @@
   <script src="https://unpkg.com/topojson-client@3"></script>
 
   <script>
-    // === CONFIG: your Google Sheet CSV endpoint ===
-    // From: https://docs.google.com/spreadsheets/d/ID/edit?gid=0
-    // Use:  https://docs.google.com/spreadsheets/d/ID/gviz/tq?tqx=out:csv&gid=0
+    // Share the sheet: "Anyone with the link: Viewer"
     const SHEET_CSV_URL =
-      "https://docs.google.com/spreadsheets/d/1958lty77Kq9c5ufIZyQVP1sqkBQfWkgLQ2hyeZPHkv8/edit?gid=0#gid=0";
+      "https://docs.google.com/spreadsheets/d/1958lty77Kq9c5ufIZyQVP1sqkBQfWkgLQ2hyeZPHkv8/gviz/tq?tqx=out:csv&gid=0";
 
-    // Display-name mapping for the map dataset
     const DISPLAY_NAME_MAP = {
       "Germany": "Germany",
       "Spain": "Spain",
@@ -96,42 +92,54 @@
       el.style.display = 'block';
     }
 
-    // Tiny CSV parser (no quotes-escaping fanciness needed for simple sheet)
+    // Robust CSV parser (handles quotes/commas-in-cells)
     function parseCSV(text) {
-      const lines = text.trim().split(/\r?\n/);
-      return lines.map(line => line.split(",").map(c => c.trim()));
+      const rows = [];
+      let row = [], cell = "";
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i], next = text[i+1];
+        if (inQuotes) {
+          if (ch === '"' && next === '"') { cell += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { cell += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ',') { row.push(cell.trim()); cell = ""; }
+          else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ""; }
+          else if (ch === '\r') { /* ignore */ }
+          else { cell += ch; }
+        }
+      }
+      row.push(cell.trim());
+      rows.push(row);
+      return rows.filter(r => r.some(c => c !== ""));
     }
 
     function parseFlexibleDate(s) {
-      // Accept "2025-10-10" or "Oct 10, 2025" etc.
       const d = new Date(s);
-      if (!isNaN(d)) return d;
-      // try to normalize e.g., "Oct 10, 2025" with missing comma
-      const try2 = new Date(s.replace(/(\d{1,2}) (\d{4})$/, "$1, $2"));
-      return isNaN(try2) ? null : try2;
+      return isNaN(d) ? null : d;
     }
 
-    // Convert CSV to our canonical data format:
-    // [{ date: "YYYY-MM-DD", countries: { Germany:n, Spain:n, Italy:n, UK:n, USA:n } }, ...]
+    // Convert CSV -> canonical data
+    // Supports:
+    //   A) Wide header: date,Germany,Spain,Italy,UK,USA
+    //   B) Two-column: row 1 = Date,<value> ; row 2+ are Country,<value> (may include a "Country,Cases" header)
     function normalizeData(csvRows) {
       if (!csvRows.length) return [];
 
-      // Two supported formats:
-      // A) Wide header row: date,Germany,Spain,Italy,UK,USA
-      // B) Two-column key/value: (Date, Oct 10, 2025), (Germany, 664), ...
-      const header = csvRows[0].map(h => h.toLowerCase());
+      // Detect wide
+      const header = csvRows[0].map(h => (h || "").toLowerCase());
+      const isWide = header.includes("date") &&
+                     header.includes("germany") &&
+                     header.includes("spain") &&
+                     header.includes("italy") &&
+                     (header.includes("uk") || header.includes("united kingdom")) &&
+                     (header.includes("usa") || header.includes("united states"));
 
-      const wantWide = header.includes("date") &&
-                       header.includes("germany") &&
-                       header.includes("spain") &&
-                       header.includes("italy") &&
-                       (header.includes("uk") || header.includes("united kingdom")) &&
-                       (header.includes("usa") || header.includes("united states"));
+      const out = [];
 
-      const rows = [];
-
-      if (wantWide) {
-        // Format A: each subsequent row: [date, Germany, Spain, Italy, UK, USA]
+      if (isWide) {
         for (let i = 1; i < csvRows.length; i++) {
           const r = csvRows[i];
           if (!r.length) continue;
@@ -140,65 +148,76 @@
           const d = parseFlexibleDate(obj["date"]);
           if (!d) continue;
           const iso = d.toISOString().slice(0,10);
-          rows.push({
+          out.push({
             date: iso,
             countries: {
               Germany: Number(obj["germany"] || 0),
-              Spain: Number(obj["spain"] || 0),
-              Italy: Number(obj["italy"] || 0),
-              UK: Number(obj["uk"] || obj["united kingdom"] || 0),
-              USA: Number(obj["usa"] || obj["united states"] || 0),
+              Spain:   Number(obj["spain"]   || 0),
+              Italy:   Number(obj["italy"]   || 0),
+              UK:      Number(obj["uk"] || obj["united kingdom"] || 0),
+              USA:     Number(obj["usa"] || obj["united states"] || 0),
             }
           });
         }
       } else {
-        // Format B: key/value pairs (two columns)
-        // We read the whole sheet as one snapshot (the latest week)
-        // Expected rows like:
+        // Two-column layout with Date in the first row
+        // Example:
         //   Date, Oct 10, 2025
+        //   Country, Cases   (optional header — ignored)
         //   Germany, 664
-        //   Spain, 368
-        //   USA, 130
-        //   Italy, 101
-        //   UK, 21
-        let dateStr = "";
+        //   Spain,   368
+        //   USA,     130
+        //   Italy,   101
+        //   UK,       21
+        let dateISO = "";
         const countries = { Germany:0, Spain:0, Italy:0, UK:0, USA:0 };
 
-        csvRows.forEach(cells => {
-          if (cells.length < 2) return;
+        for (let i = 0; i < csvRows.length; i++) {
+          const cells = csvRows[i];
+          if (!cells.length) continue;
+
+          // Key in col 0, value is the rest joined (to survive commas)
           const key = (cells[0] || "").trim();
-          const val = (cells[1] || "").trim();
-          if (!key) return;
+          const val = cells.slice(1).join(",").trim();
+          if (!key) continue;
 
           const k = key.toLowerCase();
-          if (k === "date") {
+
+          // Prefer the first non-empty Date row we see (usually row 1)
+          if (!dateISO && k === "date") {
             const d = parseFlexibleDate(val);
-            if (d) dateStr = d.toISOString().slice(0,10);
-          } else if (k === "germany") countries.Germany = Number(val || 0);
-          else if (k === "spain")   countries.Spain = Number(val || 0);
-          else if (k === "italy")   countries.Italy = Number(val || 0);
+            if (d) {
+              dateISO = d.toISOString().slice(0,10);
+              continue;
+            }
+          }
+
+          // Skip an optional "Country,Cases" header row
+          if (k === "country" || k === "countries") continue;
+
+          if (k === "germany") countries.Germany = Number(val || 0);
+          else if (k === "spain") countries.Spain = Number(val || 0);
+          else if (k === "italy") countries.Italy = Number(val || 0);
           else if (k === "uk" || k === "united kingdom") countries.UK = Number(val || 0);
           else if (k === "usa" || k === "united states") countries.USA = Number(val || 0);
-        });
+        }
 
-        if (dateStr) {
-          rows.push({ date: dateStr, countries });
+        if (dateISO) {
+          out.push({ date: dateISO, countries });
         }
       }
 
-      return rows;
+      return out;
     }
 
     async function load() {
       try {
-        // 1) Fetch CSV from Google Sheets
         const res = await fetch(SHEET_CSV_URL, { cache: 'reload' });
         if (!res.ok) throw new Error(`Failed to fetch Google Sheet (HTTP ${res.status})`);
         const csvText = await res.text();
 
-        // 2) Parse + normalize
-        const csvRows = parseCSV(csvText);
-        const data = normalizeData(csvRows);
+        const rows = parseCSV(csvText);
+        const data = normalizeData(rows);
 
         if (!data.length) {
           document.getElementById('subtitle').textContent = 'No data found in the sheet.';
@@ -206,32 +225,35 @@
           return;
         }
 
-        // 3) Latest by date
         const latest = data.sort((a,b) => a.date.localeCompare(b.date)).at(-1);
 
         const dateText = new Date(latest.date + 'T00:00:00').toLocaleDateString(undefined,
           {year: 'numeric', month: 'short', day: 'numeric'});
         document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
 
-        // 4) Render table
-        const rows = Object.entries(latest.countries).sort(([,a],[,b])=> (b||0)-(a||0));
+        const sorted = Object.entries(latest.countries).sort(([,a],[,b]) => (b||0)-(a||0));
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
-        rows.forEach(([c,v],i)=>{
-          const tr=document.createElement('tr');
-          tr.innerHTML=`<td>${i+1}</td><td>${c}</td><td class="right">${(v||0).toLocaleString()}</td>`;
+        sorted.forEach(([c,v],i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${i+1}</td><td>${c}</td><td class="right">${(v||0).toLocaleString()}</td>`;
           tbody.appendChild(tr);
         });
 
-        // 5) Total
-        const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
+        const total = sorted.reduce((s,[,n]) => s + (Number(n)||0), 0);
         document.getElementById('footnote').textContent = `Total: ${total.toLocaleString()}`;
 
-        // 6) Map highlights (only >0)
+        const DISPLAY_NAME_MAP = {
+          "Germany": "Germany",
+          "Spain": "Spain",
+          "Italy": "Italy",
+          "UK": "United Kingdom",
+          "USA": "United States of America"
+        };
         const highlights = new Set(
-          rows.filter(([,v]) => Number(v) > 0)
-              .map(([n]) => DISPLAY_NAME_MAP[n])
-              .filter(Boolean)
+          sorted.filter(([,v]) => Number(v) > 0)
+                .map(([n]) => DISPLAY_NAME_MAP[n])
+                .filter(Boolean)
         );
         await drawMap(highlights);
 
