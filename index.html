@@ -37,6 +37,7 @@
 <body>
   <!-- 1) LOGO -->
   <div class="media-card">
+    <!-- If your file name has spaces, encode them as %20 or rename it -->
     <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg" alt="Candida Campaign visual" class="media-img">
   </div>
 
@@ -74,9 +75,29 @@
   <script src="https://unpkg.com/topojson-client@3"></script>
 
   <script>
-    // Share the sheet: "Anyone with the link: Viewer"
-    const SHEET_CSV_URL =
+    // === Your Google Sheet SHARE URL ===
+    // (We will derive CSV endpoints from this automatically.)
+    const SHEET_SHARE_URL =
       "https://docs.google.com/spreadsheets/d/1958lty77Kq9c5ufIZyQVP1sqkBQfWkgLQ2hyeZPHkv8/edit?usp=sharing";
+
+    // Try "Publish to web" CSV first (most reliable), then fall back to gviz CSV
+    function buildCsvCandidates(shareUrl) {
+      const m = shareUrl.match(/\/spreadsheets\/d\/([^/]+)/);
+      if (!m) return [];
+      const id = m[1];
+
+      // Default to gid=0; if a gid exists in the share URL, use it
+      let gid = "0";
+      const gidMatch = shareUrl.match(/[?&#]gid=(\d+)/);
+      if (gidMatch) gid = gidMatch[1];
+
+      return [
+        // Publish-to-web CSV (requires File → Share → Publish to web → CSV)
+        `https://docs.google.com/spreadsheets/d/${id}/pub?gid=${gid}&single=true&output=csv`,
+        // gviz CSV export (works for many publicly readable sheets)
+        `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`
+      ];
+    }
 
     const DISPLAY_NAME_MAP = {
       "Germany": "Germany",
@@ -92,8 +113,13 @@
       el.style.display = 'block';
     }
 
-    // Robust CSV parser (handles quotes/commas-in-cells)
+    // Robust CSV parser (handles quotes + commas; auto-detects delimiter , ; or \t)
     function parseCSV(text) {
+      const firstLine = (text.split(/\r?\n/).find(l => l.trim().length) || "");
+      let delim = ",";
+      if ((firstLine.match(/\t/g) || []).length > 0) delim = "\t";
+      else if ((firstLine.match(/;/g) || []).length > 0) delim = ";";
+
       const rows = [];
       let row = [], cell = "";
       let inQuotes = false;
@@ -105,9 +131,9 @@
           else { cell += ch; }
         } else {
           if (ch === '"') { inQuotes = true; }
-          else if (ch === ',') { row.push(cell.trim()); cell = ""; }
-          else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ""; }
           else if (ch === '\r') { /* ignore */ }
+          else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ""; }
+          else if (ch === delim) { row.push(cell.trim()); cell = ""; }
           else { cell += ch; }
         }
       }
@@ -123,12 +149,15 @@
 
     // Convert CSV -> canonical data
     // Supports:
-    //   A) Wide header: date,Germany,Spain,Italy,UK,USA
-    //   B) Two-column: row 1 = Date,<value> ; row 2+ are Country,<value> (may include a "Country,Cases" header)
+    //  A) Wide header row: date,Germany,Spain,Italy,UK,USA
+    //  B) Two-column rows: row 1 = "Date, Oct 10, 2025"; rows 2+ = "Germany, 664" etc.
     function normalizeData(csvRows) {
       if (!csvRows.length) return [];
 
-      // Detect wide
+      // If Google returned an HTML page (private), bail
+      const top = csvRows.slice(0,2).map(r => r.join(" ")).join(" ").toLowerCase();
+      if (top.includes("<html")) return [];
+
       const header = csvRows[0].map(h => (h || "").toLowerCase());
       const isWide = header.includes("date") &&
                      header.includes("germany") &&
@@ -160,15 +189,7 @@
           });
         }
       } else {
-        // Two-column layout with Date in the first row
-        // Example:
-        //   Date, Oct 10, 2025
-        //   Country, Cases   (optional header — ignored)
-        //   Germany, 664
-        //   Spain,   368
-        //   USA,     130
-        //   Italy,   101
-        //   UK,       21
+        // Two-column layout with Date on the first non-empty row
         let dateISO = "";
         const countries = { Germany:0, Spain:0, Italy:0, UK:0, USA:0 };
 
@@ -176,23 +197,19 @@
           const cells = csvRows[i];
           if (!cells.length) continue;
 
-          // Key in col 0, value is the rest joined (to survive commas)
           const key = (cells[0] || "").trim();
-          const val = cells.slice(1).join(",").trim();
+          const val = (cells.slice(1).join(" ").trim());
           if (!key) continue;
 
           const k = key.toLowerCase();
 
-          // Prefer the first non-empty Date row we see (usually row 1)
           if (!dateISO && k === "date") {
             const d = parseFlexibleDate(val);
-            if (d) {
-              dateISO = d.toISOString().slice(0,10);
-              continue;
-            }
+            if (d) dateISO = d.toISOString().slice(0,10);
+            continue;
           }
 
-          // Skip an optional "Country,Cases" header row
+          // Skip optional "Country, Cases" header row
           if (k === "country" || k === "countries") continue;
 
           if (k === "germany") countries.Germany = Number(val || 0);
@@ -202,20 +219,39 @@
           else if (k === "usa" || k === "united states") countries.USA = Number(val || 0);
         }
 
-        if (dateISO) {
-          out.push({ date: dateISO, countries });
-        }
+        if (dateISO) out.push({ date: dateISO, countries });
       }
 
       return out;
     }
 
+    async function fetchSheetCSV() {
+      const candidates = buildCsvCandidates(SHEET_SHARE_URL);
+      let lastErr = null;
+
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { cache: 'reload' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+
+          // If it's HTML (private or not published), try next candidate
+          if (/<!doctype html|<html/i.test(text)) {
+            lastErr = new Error('Sheet returned HTML (not CSV). Try publishing to web.');
+            continue;
+          }
+
+          return text; // CSV text
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('Unable to fetch CSV from Google Sheets.');
+    }
+
     async function load() {
       try {
-        const res = await fetch(SHEET_CSV_URL, { cache: 'reload' });
-        if (!res.ok) throw new Error(`Failed to fetch Google Sheet (HTTP ${res.status})`);
-        const csvText = await res.text();
-
+        const csvText = await fetchSheetCSV();
         const rows = parseCSV(csvText);
         const data = normalizeData(rows);
 
@@ -243,13 +279,6 @@
         const total = sorted.reduce((s,[,n]) => s + (Number(n)||0), 0);
         document.getElementById('footnote').textContent = `Total: ${total.toLocaleString()}`;
 
-        const DISPLAY_NAME_MAP = {
-          "Germany": "Germany",
-          "Spain": "Spain",
-          "Italy": "Italy",
-          "UK": "United Kingdom",
-          "USA": "United States of America"
-        };
         const highlights = new Set(
           sorted.filter(([,v]) => Number(v) > 0)
                 .map(([n]) => DISPLAY_NAME_MAP[n])
@@ -259,7 +288,7 @@
 
       } catch (e) {
         console.error(e);
-        showError(String(e));
+        showError('Could not read your Google Sheet. Make sure it is published or publicly viewable.\n' + e.message);
         try { await drawMap(new Set()); } catch {}
       }
     }
