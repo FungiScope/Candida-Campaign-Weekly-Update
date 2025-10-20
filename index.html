@@ -14,37 +14,39 @@
     th { font-weight: 700; }
     .right { text-align: right; }
     .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; }
-    .footer { margin-top: 2rem; font-size: 0.9rem; color: #666; }
+    .footer { margin-top: 0.75rem; font-size: 0.9rem; color: #666; }
     .error { margin-top: 1rem; color: #b00020; background: #ffeef0; border: 1px solid #ffcdd2; padding: 0.75rem; border-radius: 8px; max-width: 700px; display:none; }
-    .media-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; margin-top: 1rem; }
+
+    /* Media (logo/image) */
+    .media-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px;
+                  box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; margin-bottom: 1rem; }
     .media-img  { width: 100%; height: auto; display: block; }
 
+    /* Map */
+    .map-wrap { margin-top: 2rem; max-width: 700px; }
+    .map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+    #map { width: 100%; height: auto; }
 
-  /* Map */
-.map-wrap { margin-top: 2rem; max-width: 700px; }
-.map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-#map { width: 100%; height: auto; }
+    /* Neutral base for all countries, teal only for highlighted ones */
+    .country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
+    .country.highlight { fill: #0B9DB0; }
 
-/* Neutral base for all countries, dark green only for highlighted ones */
-.country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
-.country.highlight { fill: #0B9DB0; }
-
-.map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
+    .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
   </style>
-<div class="card">
-  <table id="cases-table" aria-describedby="subtitle"> ... </table>
-  <div class="footer" id="footnote"></div>
-</div>
-<div class="media-card">
-  <img src="Candida_20230801Seidel_FS Candida_vs.jpg" alt="Candida Campaign visual" class="media-img">
-</div>
-
-  
 </head>
 <body>
+  <!-- 1) LOGO / IMAGE -->
+  <div class="media-card">
+    <!-- If your file name contains spaces, encode them as %20 or rename the file -->
+    <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg"
+         alt="Candida Campaign visual" class="media-img">
+  </div>
+
+  <!-- 2) TITLE + SUBTITLE -->
   <h1>Study Weekly Cases</h1>
   <div class="muted" id="subtitle">Loading latest week…</div>
 
+  <!-- 3) TABLE + 4) TOTAL SUMMARY (inside same card) -->
   <div class="card">
     <table id="cases-table" aria-describedby="subtitle">
       <thead>
@@ -56,24 +58,20 @@
       </thead>
       <tbody></tbody>
     </table>
-  <!-- total summary directly under the table -->
     <div class="footer" id="footnote"></div>
   </div>
- 
-  
- 
-  
+
   <div id="error" class="error" role="alert"></div>
 
-  <!-- Small Map -->
+  <!-- 5) MAP -->
   <div class="map-wrap">
     <div class="map-card">
       <svg id="map" viewBox="0 0 700 380" role="img" aria-label="World map highlighting countries"></svg>
-      <div class="map-caption">Countries from the latest week highlighted in light blue.</div>
+      <div class="map-caption">Countries from the latest week highlighted.</div>
     </div>
   </div>
 
-   <!-- D3 + TopoJSON -->
+  <!-- D3 + TopoJSON -->
   <script src="https://unpkg.com/d3@7"></script>
   <script src="https://unpkg.com/topojson-client@3"></script>
 
@@ -129,42 +127,41 @@
       }
     }
 
-async function drawMap(highlightNames) {
-  const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
-  const world = await worldRes.json();
-  const countries = topojson.feature(world, world.objects.countries).features;
+    async function drawMap(highlightNames) {
+      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
+      const world = await worldRes.json();
+      const countries = topojson.feature(world, world.objects.countries).features;
 
-  const svg = d3.select('#map');
-  svg.selectAll('*').remove();
+      const svg = d3.select('#map');
+      svg.selectAll('*').remove();
 
-  const width = 700, height = 380;
-  const projection = d3.geoNaturalEarth1().fitSize([width, height], { type: 'Sphere' });
-  const path = d3.geoPath(projection);
+      const width = 700, height = 380;
+      const projection = d3.geoNaturalEarth1().fitSize([width, height], { type: 'Sphere' });
+      const path = d3.geoPath(projection);
 
-  // Blueish ocean
-  svg.append('path')
-    .attr('d', path({ type: 'Sphere' }))
-    .attr('fill', '#eef6ff');
+      // Blueish ocean
+      svg.append('path')
+        .attr('d', path({ type: 'Sphere' }))
+        .attr('fill', '#eef6ff');
 
-  // Countries
-  svg.append('g')
-    .selectAll('path')
-    .data(countries)
-    .join('path')
-    .attr('d', path)
-    .attr('class', d => {
-      const name = d.properties.name || d.properties.NAME || d.properties.admin || '';
-      return highlightNames.has(name) ? 'country highlight' : 'country';
-    });
+      // Countries
+      svg.append('g')
+        .selectAll('path')
+        .data(countries)
+        .join('path')
+        .attr('d', path)
+        .attr('class', d => {
+          const name = d.properties.name || d.properties.NAME || d.properties.admin || '';
+          return highlightNames.has(name) ? 'country highlight' : 'country';
+        });
 
-  // Borders
-  svg.append('path')
-    .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
-    .attr('fill', 'none')
-    .attr('stroke', '#cfcfcf')
-    .attr('stroke-width', 0.4);
-}
-
+      // Borders
+      svg.append('path')
+        .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
+        .attr('fill', 'none')
+        .attr('stroke', '#cfcfcf')
+        .attr('stroke-width', 0.4);
+    }
 
     document.addEventListener('DOMContentLoaded', load);
   </script>
