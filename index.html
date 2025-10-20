@@ -114,33 +114,42 @@
       }
     }
 
-    async function drawMap(highlightNames){
-      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json',{cache:'force-cache'});
-      const world = await worldRes.json();
-      const countries = topojson.feature(world, world.objects.countries).features;
+async function drawMap(highlightNames) {
+  const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
+  const world = await worldRes.json();
+  const countries = topojson.feature(world, world.objects.countries).features;
 
-      const svg=d3.select('#map');
-      svg.selectAll('*').remove();
+  const svg = d3.select('#map');
+  svg.selectAll('*').remove();
 
-      const width=700, height=380;
-      const projection=d3.geoNaturalEarth1().fitSize([width,height],{type:'Sphere'});
-      const path=d3.geoPath(projection);
+  const width = 700, height = 380;
+  const projection = d3.geoNaturalEarth1().fitSize([width, height], { type: 'Sphere' });
+  const path = d3.geoPath(projection);
 
-      svg.append('path').attr('d',path({type:'Sphere'})).attr('fill','#eef6ff');
+  // Blueish ocean
+  svg.append('path')
+    .attr('d', path({ type: 'Sphere' }))
+    .attr('fill', '#eef6ff');
 
-      svg.append('g').selectAll('path').data(countries).join('path')
-        .attr('class',d=>{
-          const name=d.properties.name||d.properties.NAME||d.properties.admin||'';
-          return 'country'+(highlightNames.has(name)?' highlight':'');
-        })
-        .attr('d',path);
+  // Countries
+  svg.append('g')
+    .selectAll('path')
+    .data(countries)
+    .join('path')
+    .attr('d', path)
+    .attr('class', d => {
+      const name = d.properties.name || d.properties.NAME || d.properties.admin || '';
+      return highlightNames.has(name) ? 'country highlight' : 'country';
+    });
 
-      svg.append('path')
-        .attr('d',d3.geoPath(projection)(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)))
-        .attr('fill','none')
-        .attr('stroke','#cfcfcf')
-        .attr('stroke-width',0.4);
-    }
+  // Borders
+  svg.append('path')
+    .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
+    .attr('fill', 'none')
+    .attr('stroke', '#cfcfcf')
+    .attr('stroke-width', 0.4);
+}
+
 
     document.addEventListener('DOMContentLoaded', load);
   </script>
