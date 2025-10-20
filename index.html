@@ -17,13 +17,16 @@
     .footer { margin-top: 2rem; font-size: 0.9rem; color: #666; }
     .error { margin-top: 1rem; color: #b00020; background: #ffeef0; border: 1px solid #ffcdd2; padding: 0.75rem; border-radius: 8px; max-width: 700px; display:none; }
 
-    /* Map */
-    .map-wrap { margin-top: 2rem; max-width: 700px; }
-    .map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-    #map { width: 100%; height: auto; }
-    .country { fill: #18392B; stroke: #cfcfcf; stroke-width: 0.5; }
-    .country.highlight { fill: #18392B; } /* light blue */
-    .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
+  /* Map */
+.map-wrap { margin-top: 2rem; max-width: 700px; }
+.map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+#map { width: 100%; height: auto; }
+
+/* Neutral base for all countries, dark green only for highlighted ones */
+.country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
+.country.highlight { fill: #18392B; }
+
+.map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
   </style>
 </head>
 <body>
