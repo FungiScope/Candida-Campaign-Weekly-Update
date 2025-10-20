@@ -74,262 +74,197 @@
   <script src="https://unpkg.com/d3@7"></script>
   <script src="https://unpkg.com/topojson-client@3"></script>
 
-  <script>
-    // === Your Google Sheet SHARE URL ===
-    // (We will derive CSV endpoints from this automatically.)
-    const SHEET_SHARE_URL =
-      "https://docs.google.com/spreadsheets/d/1958lty77Kq9c5ufIZyQVP1sqkBQfWkgLQ2hyeZPHkv8/edit?usp=sharing";
 
-    // Try "Publish to web" CSV first (most reliable), then fall back to gviz CSV
-    function buildCsvCandidates(shareUrl) {
-      const m = shareUrl.match(/\/spreadsheets\/d\/([^/]+)/);
-      if (!m) return [];
-      const id = m[1];
+<script>
+  // 1) Your published CSV URL from Google Sheets
+  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSmn5-K-WAyl8qPn5v_VGIPcv1k2w_X1fCXZchDxyR1iyap7E5qDo6kAbg4PgQFJ2adg_siObt4vY3q/pub?gid=0&single=true&output=csv";
 
-      // Default to gid=0; if a gid exists in the share URL, use it
-      let gid = "0";
-      const gidMatch = shareUrl.match(/[?&#]gid=(\d+)/);
-      if (gidMatch) gid = gidMatch[1];
+  // Names mapping used only for the map highlight
+  const DISPLAY_NAME_MAP = {
+    "Germany": "Germany",
+    "Spain": "Spain",
+    "Italy": "Italy",
+    "UK": "United Kingdom",
+    "USA": "United States of America"
+  };
 
-      return [
-        // Publish-to-web CSV (requires File → Share → Publish to web → CSV)
-        `https://docs.google.com/spreadsheets/d/${id}/pub?gid=${gid}&single=true&output=csv`,
-        // gviz CSV export (works for many publicly readable sheets)
-        `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`
-      ];
-    }
+  function showError(msg) {
+    const el = document.getElementById('error');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
 
-    const DISPLAY_NAME_MAP = {
-      "Germany": "Germany",
-      "Spain": "Spain",
-      "Italy": "Italy",
-      "UK": "United Kingdom",
-      "USA": "United States of America"
-    };
+  // Robust CSV parser (handles quotes and commas; auto-detects delimiter , ; or \t)
+  function parseCSV(text) {
+    const firstLine = (text.split(/\r?\n/).find(l => l.trim().length) || "");
+    let delim = ",";
+    if ((firstLine.match(/\t/g) || []).length > 0) delim = "\t";
+    else if ((firstLine.match(/;/g) || []).length > 0) delim = ";";
 
-    function showError(msg) {
-      const el = document.getElementById('error');
-      el.textContent = msg;
-      el.style.display = 'block';
-    }
+    const rows = [];
+    let row = [], cell = "";
+    let inQuotes = false;
 
-    // Robust CSV parser (handles quotes + commas; auto-detects delimiter , ; or \t)
-    function parseCSV(text) {
-      const firstLine = (text.split(/\r?\n/).find(l => l.trim().length) || "");
-      let delim = ",";
-      if ((firstLine.match(/\t/g) || []).length > 0) delim = "\t";
-      else if ((firstLine.match(/;/g) || []).length > 0) delim = ";";
-
-      const rows = [];
-      let row = [], cell = "";
-      let inQuotes = false;
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i], next = text[i+1];
-        if (inQuotes) {
-          if (ch === '"' && next === '"') { cell += '"'; i++; }
-          else if (ch === '"') { inQuotes = false; }
-          else { cell += ch; }
-        } else {
-          if (ch === '"') { inQuotes = true; }
-          else if (ch === '\r') { /* ignore */ }
-          else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ""; }
-          else if (ch === delim) { row.push(cell.trim()); cell = ""; }
-          else { cell += ch; }
-        }
-      }
-      row.push(cell.trim());
-      rows.push(row);
-      return rows.filter(r => r.some(c => c !== ""));
-    }
-
-    function parseFlexibleDate(s) {
-      const d = new Date(s);
-      return isNaN(d) ? null : d;
-    }
-
-    // Convert CSV -> canonical data
-    // Supports:
-    //  A) Wide header row: date,Germany,Spain,Italy,UK,USA
-    //  B) Two-column rows: row 1 = "Date, Oct 10, 2025"; rows 2+ = "Germany, 664" etc.
-    function normalizeData(csvRows) {
-      if (!csvRows.length) return [];
-
-      // If Google returned an HTML page (private), bail
-      const top = csvRows.slice(0,2).map(r => r.join(" ")).join(" ").toLowerCase();
-      if (top.includes("<html")) return [];
-
-      const header = csvRows[0].map(h => (h || "").toLowerCase());
-      const isWide = header.includes("date") &&
-                     header.includes("germany") &&
-                     header.includes("spain") &&
-                     header.includes("italy") &&
-                     (header.includes("uk") || header.includes("united kingdom")) &&
-                     (header.includes("usa") || header.includes("united states"));
-
-      const out = [];
-
-      if (isWide) {
-        for (let i = 1; i < csvRows.length; i++) {
-          const r = csvRows[i];
-          if (!r.length) continue;
-          const obj = {};
-          header.forEach((h, idx) => obj[h] = r[idx] ?? "");
-          const d = parseFlexibleDate(obj["date"]);
-          if (!d) continue;
-          const iso = d.toISOString().slice(0,10);
-          out.push({
-            date: iso,
-            countries: {
-              Germany: Number(obj["germany"] || 0),
-              Spain:   Number(obj["spain"]   || 0),
-              Italy:   Number(obj["italy"]   || 0),
-              UK:      Number(obj["uk"] || obj["united kingdom"] || 0),
-              USA:     Number(obj["usa"] || obj["united states"] || 0),
-            }
-          });
-        }
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i], next = text[i+1];
+      if (inQuotes) {
+        if (ch === '"' && next === '"') { cell += '"'; i++; }
+        else if (ch === '"') { inQuotes = false; }
+        else { cell += ch; }
       } else {
-        // Two-column layout with Date on the first non-empty row
-        let dateISO = "";
-        const countries = { Germany:0, Spain:0, Italy:0, UK:0, USA:0 };
+        if (ch === '"') { inQuotes = true; }
+        else if (ch === '\r') { /* ignore */ }
+        else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ""; }
+        else if (ch === delim) { row.push(cell.trim()); cell = ""; }
+        else { cell += ch; }
+      }
+    }
+    row.push(cell.trim());
+    rows.push(row);
+    return rows.filter(r => r.some(c => c !== ""));
+  }
 
-        for (let i = 0; i < csvRows.length; i++) {
-          const cells = csvRows[i];
-          if (!cells.length) continue;
+  function parseFlexibleDate(s) {
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
 
-          const key = (cells[0] || "").trim();
-          const val = (cells.slice(1).join(" ").trim());
-          if (!key) continue;
+  // Accepts either:
+  //  A) Wide header row: date,Germany,Spain,Italy,UK,USA
+  //  B) Two-column: first row "Date, Oct 10, 2025"; following rows "Germany, 664", etc.
+  function normalizeData(csvRows) {
+    if (!csvRows.length) return [];
 
-          const k = key.toLowerCase();
+    // If Google returned HTML (not CSV), bail
+    const top = csvRows.slice(0,2).map(r => r.join(" ")).join(" ").toLowerCase();
+    if (top.includes("<html")) return [];
 
-          if (!dateISO && k === "date") {
-            const d = parseFlexibleDate(val);
-            if (d) dateISO = d.toISOString().slice(0,10);
-            continue;
+    const header = csvRows[0].map(h => (h || "").toLowerCase());
+    const isWide = header.includes("date") &&
+                   header.includes("germany") &&
+                   header.includes("spain") &&
+                   header.includes("italy") &&
+                   (header.includes("uk") || header.includes("united kingdom")) &&
+                   (header.includes("usa") || header.includes("united states"));
+
+    const out = [];
+
+    if (isWide) {
+      for (let i = 1; i < csvRows.length; i++) {
+        const r = csvRows[i];
+        if (!r.length) continue;
+        const obj = {};
+        header.forEach((h, idx) => obj[h] = r[idx] ?? "");
+        const d = parseFlexibleDate(obj["date"]);
+        if (!d) continue;
+        const iso = d.toISOString().slice(0,10);
+        out.push({
+          date: iso,
+          countries: {
+            Germany: Number(obj["germany"] || 0),
+            Spain:   Number(obj["spain"]   || 0),
+            Italy:   Number(obj["italy"]   || 0),
+            UK:      Number(obj["uk"] || obj["united kingdom"] || 0),
+            USA:     Number(obj["usa"] || obj["united states"] || 0),
           }
-
-          // Skip optional "Country, Cases" header row
-          if (k === "country" || k === "countries") continue;
-
-          if (k === "germany") countries.Germany = Number(val || 0);
-          else if (k === "spain") countries.Spain = Number(val || 0);
-          else if (k === "italy") countries.Italy = Number(val || 0);
-          else if (k === "uk" || k === "united kingdom") countries.UK = Number(val || 0);
-          else if (k === "usa" || k === "united states") countries.USA = Number(val || 0);
-        }
-
-        if (dateISO) out.push({ date: dateISO, countries });
-      }
-
-      return out;
-    }
-
-    async function fetchSheetCSV() {
-      const candidates = buildCsvCandidates(SHEET_SHARE_URL);
-      let lastErr = null;
-
-      for (const url of candidates) {
-        try {
-          const res = await fetch(url, { cache: 'reload' });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const text = await res.text();
-
-          // If it's HTML (private or not published), try next candidate
-          if (/<!doctype html|<html/i.test(text)) {
-            lastErr = new Error('Sheet returned HTML (not CSV). Try publishing to web.');
-            continue;
-          }
-
-          return text; // CSV text
-        } catch (e) {
-          lastErr = e;
-        }
-      }
-      throw lastErr || new Error('Unable to fetch CSV from Google Sheets.');
-    }
-
-    async function load() {
-      try {
-        const csvText = await fetchSheetCSV();
-        const rows = parseCSV(csvText);
-        const data = normalizeData(rows);
-
-        if (!data.length) {
-          document.getElementById('subtitle').textContent = 'No data found in the sheet.';
-          await drawMap(new Set());
-          return;
-        }
-
-        const latest = data.sort((a,b) => a.date.localeCompare(b.date)).at(-1);
-
-        const dateText = new Date(latest.date + 'T00:00:00').toLocaleDateString(undefined,
-          {year: 'numeric', month: 'short', day: 'numeric'});
-        document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
-
-        const sorted = Object.entries(latest.countries).sort(([,a],[,b]) => (b||0)-(a||0));
-        const tbody = document.querySelector('#cases-table tbody');
-        tbody.innerHTML = '';
-        sorted.forEach(([c,v],i) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${i+1}</td><td>${c}</td><td class="right">${(v||0).toLocaleString()}</td>`;
-          tbody.appendChild(tr);
         });
-
-        const total = sorted.reduce((s,[,n]) => s + (Number(n)||0), 0);
-        document.getElementById('footnote').textContent = `Total: ${total.toLocaleString()}`;
-
-        const highlights = new Set(
-          sorted.filter(([,v]) => Number(v) > 0)
-                .map(([n]) => DISPLAY_NAME_MAP[n])
-                .filter(Boolean)
-        );
-        await drawMap(highlights);
-
-      } catch (e) {
-        console.error(e);
-        showError('Could not read your Google Sheet. Make sure it is published or publicly viewable.\n' + e.message);
-        try { await drawMap(new Set()); } catch {}
       }
+    } else {
+      // Two-column layout
+      let dateISO = "";
+      const countries = { Germany:0, Spain:0, Italy:0, UK:0, USA:0 };
+
+      for (let i = 0; i < csvRows.length; i++) {
+        const cells = csvRows[i];
+        if (!cells.length) continue;
+
+        const key = (cells[0] || "").trim();
+        const val = (cells.slice(1).join(" ").trim());
+        if (!key) continue;
+
+        const k = key.toLowerCase();
+
+        if (!dateISO && k === "date") {
+          const d = parseFlexibleDate(val);
+          if (d) dateISO = d.toISOString().slice(0,10);
+          continue;
+        }
+
+        // Skip optional header like "Country, Cases"
+        if (k === "country" || k === "countries") continue;
+
+        if (k === "germany") countries.Germany = Number(val || 0);
+        else if (k === "spain") countries.Spain = Number(val || 0);
+        else if (k === "italy") countries.Italy = Number(val || 0);
+        else if (k === "uk" || k === "united kingdom") countries.UK = Number(val || 0);
+        else if (k === "usa" || k === "united states") countries.USA = Number(val || 0);
+      }
+      if (dateISO) out.push({ date: dateISO, countries });
     }
 
-    async function drawMap(highlightNames) {
-      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
-      const world = await worldRes.json();
-      const countries = topojson.feature(world, world.objects.countries).features;
+    return out;
+  }
 
-      const svg = d3.select('#map');
-      svg.selectAll('*').remove();
+  async function load() {
+    try {
+      // 2) Fetch CSV with a cache-buster to always get fresh values
+      const url = SHEET_CSV_URL + (SHEET_CSV_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Failed to fetch Google Sheet CSV (HTTP ${res.status})`);
+      const text = await res.text();
 
-      const width = 700, height = 380;
-      const projection = d3.geoNaturalEarth1().fitSize([width, height], { type: 'Sphere' });
-      const path = d3.geoPath(projection);
+      // Private / misconfigured sheet guard
+      if (/<!doctype html|<html/i.test(text)) {
+        throw new Error('The Google Sheet CSV is not publicly accessible. In Sheets: File → Share → Publish to web → CSV.');
+      }
 
-      // Blueish ocean
-      svg.append('path')
-        .attr('d', path({ type: 'Sphere' }))
-        .attr('fill', '#eef6ff');
+      const rows = parseCSV(text);
+      const data = normalizeData(rows);
 
-      // Countries
-      svg.append('g')
-        .selectAll('path')
-        .data(countries)
-        .join('path')
-        .attr('d', path)
-        .attr('class', d => {
-          const name = d.properties.name || d.properties.NAME || d.properties.admin || '';
-          return highlightNames.has(name) ? 'country highlight' : 'country';
-        });
+      if (!data.length) {
+        document.getElementById('subtitle').textContent = 'No data found in the sheet.';
+        if (typeof drawMap === "function") await drawMap(new Set());
+        return;
+      }
 
-      // Borders
-      svg.append('path')
-        .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
-        .attr('fill', 'none')
-        .attr('stroke', '#cfcfcf')
-        .attr('stroke-width', 0.4);
+      // Latest by date
+      const latest = data.sort((a,b) => a.date.localeCompare(b.date)).at(-1);
+
+      const dateText = new Date(latest.date + 'T00:00:00').toLocaleDateString(undefined,
+        {year: 'numeric', month: 'short', day: 'numeric'});
+      document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
+
+      // Render table
+      const sorted = Object.entries(latest.countries).sort(([,a],[,b]) => (b||0)-(a||0));
+      const tbody = document.querySelector('#cases-table tbody');
+      tbody.innerHTML = '';
+      sorted.forEach(([c,v],i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${i+1}</td><td>${c}</td><td class="right">${(v||0).toLocaleString()}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      const total = sorted.reduce((s,[,n]) => s + (Number(n)||0), 0);
+      document.getElementById('footnote').textContent = `Total: ${total.toLocaleString()}`;
+
+      // Map highlights (only countries with >0 cases)
+      const highlights = new Set(
+        sorted.filter(([,v]) => Number(v) > 0)
+              .map(([n]) => DISPLAY_NAME_MAP[n])
+              .filter(Boolean)
+      );
+      if (typeof drawMap === "function") await drawMap(highlights);
+
+    } catch (e) {
+      console.error(e);
+      showError(e.message || String(e));
+      try { if (typeof drawMap === "function") await drawMap(new Set()); } catch {}
     }
+  }
 
-    document.addEventListener('DOMContentLoaded', load);
-  </script>
+  document.addEventListener('DOMContentLoaded', load);
+</script>
+
 </body>
 </html>
