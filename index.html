@@ -57,29 +57,29 @@
   <script src="https://unpkg.com/topojson-client@3"></script>
 
   <script>
-    // Map country display names (as in your JSON) to ISO3 codes in the world Atlas
-    const NAME_TO_ISO3 = {
-      "Germany": "DEU",
-      "Spain": "ESP",
-      "Italy": "ITA",
-      "UK": "GBR",      // GitHub JSON uses "UK"; ISO3 is GBR
-      "USA": "USA"
+    // Map table names to dataset display names
+    const DISPLAY_NAME_MAP = {
+      "Germany": "Germany",
+      "Spain": "Spain",
+      "Italy": "Italy",
+      "UK": "United Kingdom",
+      "USA": "United States of America"
     };
 
     async function load() {
       try {
-        // Load data (cache-bust to avoid CDN staleness)
-        const res = await fetch('data/data.json?v=' + Date.now(), { cache: 'no-store' });
+        // Use normal caching for data so reloads are fast
+        const res = await fetch('data/data.json', { cache: 'reload' });
         if (!res.ok) throw new Error('Failed to fetch data.json');
         const data = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
           document.getElementById('subtitle').textContent = 'No data yet.';
-          drawMap(new Set()); // draw base map only
+          await drawMap(new Set());
           return;
         }
 
-        // Latest week
+        // Find latest week by date string
         const latest = data
           .filter(w => w && w.date && w.countries)
           .sort((a,b) => (a.date > b.date ? 1 : -1))
@@ -90,12 +90,12 @@
         });
         document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
 
-        const countries = Object.entries(latest.countries);
-        countries.sort(([,a],[,b]) => (b ?? 0) - (a ?? 0));
+        const rows = Object.entries(latest.countries)
+          .sort(([,a],[,b]) => (b ?? 0) - (a ?? 0));
 
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
-        countries.forEach(([country, cases], idx) => {
+        rows.forEach(([country, cases], idx) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${idx+1}</td>
@@ -105,35 +105,30 @@
           tbody.appendChild(tr);
         });
 
-        const total = countries.reduce((sum, [,n]) => sum + (Number(n)||0), 0);
+        const total = rows.reduce((sum, [,n]) => sum + (Number(n)||0), 0);
         document.getElementById('footnote').textContent =
           `Total cases (latest week): ${total.toLocaleString()} • Historical weeks stored: ${data.length}`;
 
-        // Build set of ISO3 codes to highlight (only the countries present in the table)
-        const highlightISO3 = new Set(
-          countries
-            .map(([name]) => NAME_TO_ISO3[name])
-            .filter(Boolean)
+        // Names to highlight on the map (as the dataset names)
+        const highlightNames = new Set(
+          rows.map(([name]) => DISPLAY_NAME_MAP[name]).filter(Boolean)
         );
 
-        await drawMap(highlightISO3);
+        await drawMap(highlightNames);
 
       } catch (err) {
-        document.getElementById('subtitle').textContent = 'Error loading data.';
         console.error(err);
-        // still draw base map so the page isn't empty
+        document.getElementById('subtitle').textContent = 'Error loading data.';
         drawMap(new Set()).catch(() => {});
       }
     }
 
-    async function drawMap(highlightISO3) {
-     // Fetch the map once and reuse browser cache
-const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
-
+    async function drawMap(highlightNames) {
+      // Lightweight 1:50m map; cache aggressively
+      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json', { cache: 'force-cache' });
       const world = await worldRes.json();
 
-      const { feature } = topojson;
-      const countries = feature(world, world.objects.countries).features;
+      const countries = topojson.feature(world, world.objects.countries).features;
 
       const svg = d3.select('#map');
       svg.selectAll('*').remove(); // clear for redraw
@@ -153,8 +148,23 @@ const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-50m.json
         .data(countries)
         .join('path')
         .attr('class', d => {
-          // d.id is numeric; ISO3 is in d.properties.name? Not guaranteed.
-          // world-atlas v2 adds ISO_A3 in properties for some builds; if not present, map via a known lookup.
-          // We’ll try common props and fall back to a small built-in table for our five.
-          const iso3 = (d.properties && (d.properties.iso_a3 || d.properties.ISO_A3 || d.properties.adm0_a3)) || null;
-          const code = iso3 || isoFromName(d.properties && d.pro
+          // Try common name fields in the dataset
+          const name =
+            (d.properties && (d.properties.name || d.properties.NAME || d.properties.admin)) || '';
+          const shouldHighlight = highlightNames.has(name);
+          return 'country' + (shouldHighlight ? ' highlight' : '');
+        })
+        .attr('d', path);
+
+      // Borders
+      svg.append('path')
+        .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a,b) => a !== b)))
+        .attr('fill', 'none')
+        .attr('stroke', '#cfcfcf')
+        .attr('stroke-width', 0.5);
+    }
+
+    load();
+  </script>
+</body>
+</html>
