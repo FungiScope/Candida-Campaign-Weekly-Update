@@ -15,6 +15,14 @@
     .right { text-align: right; }
     .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 720px; }
     .footer { margin-top: 2rem; font-size: 0.9rem; color: #666; }
+
+    /* Map styles */
+    .map-wrap { margin-top: 2rem; max-width: 900px; }
+    .map-card { padding: 1rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+    #map { width: 100%; height: auto; }
+    .country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
+    .country.highlight { fill: #cfe8ff; } /* light blue */
+    .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -34,21 +42,44 @@
     </table>
   </div>
 
+  <!-- Map -->
+  <div class="map-wrap">
+    <div class="map-card">
+      <svg id="map" viewBox="0 0 960 520" role="img" aria-label="World map highlighting countries from the latest update"></svg>
+      <div class="map-caption">Countries from the latest week are highlighted in light blue.</div>
+    </div>
+  </div>
+
   <div class="footer" id="footnote"></div>
 
+  <!-- D3 + TopoJSON -->
+  <script src="https://unpkg.com/d3@7"></script>
+  <script src="https://unpkg.com/topojson-client@3"></script>
+
   <script>
+    // Map country display names (as in your JSON) to ISO3 codes in the world Atlas
+    const NAME_TO_ISO3 = {
+      "Germany": "DEU",
+      "Spain": "ESP",
+      "Italy": "ITA",
+      "UK": "GBR",      // GitHub JSON uses "UK"; ISO3 is GBR
+      "USA": "USA"
+    };
+
     async function load() {
       try {
-        const res = await fetch('data/data.json', { cache: 'no-store' });
+        // Load data (cache-bust to avoid CDN staleness)
+        const res = await fetch('data/data.json?v=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to fetch data.json');
         const data = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
           document.getElementById('subtitle').textContent = 'No data yet.';
+          drawMap(new Set()); // draw base map only
           return;
         }
 
-        // Find latest week by date
+        // Latest week
         const latest = data
           .filter(w => w && w.date && w.countries)
           .sort((a,b) => (a.date > b.date ? 1 : -1))
@@ -64,7 +95,6 @@
 
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
-
         countries.forEach(([country, cases], idx) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -78,12 +108,52 @@
         const total = countries.reduce((sum, [,n]) => sum + (Number(n)||0), 0);
         document.getElementById('footnote').textContent =
           `Total cases (latest week): ${total.toLocaleString()} • Historical weeks stored: ${data.length}`;
+
+        // Build set of ISO3 codes to highlight (only the countries present in the table)
+        const highlightISO3 = new Set(
+          countries
+            .map(([name]) => NAME_TO_ISO3[name])
+            .filter(Boolean)
+        );
+
+        await drawMap(highlightISO3);
+
       } catch (err) {
         document.getElementById('subtitle').textContent = 'Error loading data.';
         console.error(err);
+        // still draw base map so the page isn't empty
+        drawMap(new Set()).catch(() => {});
       }
     }
-    load();
-  </script>
-</body>
-</html>
+
+    async function drawMap(highlightISO3) {
+      // Fetch a lightweight world TopoJSON
+      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-110m.json');
+      const world = await worldRes.json();
+
+      const { feature } = topojson;
+      const countries = feature(world, world.objects.countries).features;
+
+      const svg = d3.select('#map');
+      svg.selectAll('*').remove(); // clear for redraw
+
+      const width = 960, height = 520;
+      const projection = d3.geoNaturalEarth1().fitSize([width, height], {type: "Sphere"});
+      const path = d3.geoPath(projection);
+
+      // Sphere (ocean)
+      svg.append('path')
+        .attr('d', path({type: "Sphere"}))
+        .attr('fill', '#eef6ff');
+
+      // Countries
+      svg.append('g')
+        .selectAll('path')
+        .data(countries)
+        .join('path')
+        .attr('class', d => {
+          // d.id is numeric; ISO3 is in d.properties.name? Not guaranteed.
+          // world-atlas v2 adds ISO_A3 in properties for some builds; if not present, map via a known lookup.
+          // We’ll try common props and fall back to a small built-in table for our five.
+          const iso3 = (d.properties && (d.properties.iso_a3 || d.properties.ISO_A3 || d.properties.adm0_a3)) || null;
+          const code = iso3 || isoFromName(d.properties && d.pro
