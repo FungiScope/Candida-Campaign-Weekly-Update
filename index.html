@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Study Weekly Cases</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 2rem; }
+    h1 { margin: 0 0 0.25rem 0; }
+    .muted { color: #666; margin-bottom: 1rem; }
+    table { border-collapse: collapse; width: 100%; max-width: 700px; }
+    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left; }
+    th { font-weight: 700; }
+    .right { text-align: right; }
+    .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 720px; }
+    .footer { margin-top: 2rem; font-size: 0.9rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Study Weekly Cases</h1>
+  <div class="muted" id="subtitle">Loading latest week…</div>
+
+  <div class="card">
+    <table id="cases-table" aria-describedby="subtitle">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Country</th>
+          <th scope="col" class="right">Cases</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="footer" id="footnote"></div>
+
+  <script>
+    async function load() {
+      try {
+        const res = await fetch('data/data.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to fetch data.json');
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById('subtitle').textContent = 'No data yet.';
+          return;
+        }
+
+        // Find latest week by date
+        const latest = data
+          .filter(w => w && w.date && w.countries)
+          .sort((a,b) => (a.date > b.date ? 1 : -1))
+          .at(-1);
+
+        const dateText = new Date(latest.date + 'T00:00:00').toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+        document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
+
+        const countries = Object.entries(latest.countries);
+        countries.sort(([,a],[,b]) => (b ?? 0) - (a ?? 0));
+
+        const tbody = document.querySelector('#cases-table tbody');
+        tbody.innerHTML = '';
+
+        countries.forEach(([country, cases], idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${idx+1}</td>
+            <td>${country}</td>
+            <td class="right">${Number(cases ?? 0).toLocaleString()}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const total = countries.reduce((sum, [,n]) => sum + (Number(n)||0), 0);
+        document.getElementById('footnote').textContent =
+          `Total cases (latest week): ${total.toLocaleString()} • Historical weeks stored: ${data.length}`;
+      } catch (err) {
+        document.getElementById('subtitle').textContent = 'Error loading data.';
+        console.error(err);
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
