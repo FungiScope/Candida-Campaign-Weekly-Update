@@ -127,8 +127,9 @@
     }
 
     async function drawMap(highlightISO3) {
-      // Fetch a lightweight world TopoJSON
-      const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-110m.json');
+     // Fetch the map once and reuse browser cache
+const worldRes = await fetch('https://unpkg.com/world-atlas@2/countries-110m.json', { cache: 'force-cache' });
+
       const world = await worldRes.json();
 
       const { feature } = topojson;
