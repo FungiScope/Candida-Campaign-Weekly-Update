@@ -35,6 +35,15 @@
     .country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
     .country.highlight { fill: #0B9DB0; }
     .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
+
+    /* Publication teaser under the map */
+    .pub-wrap { margin-top: 1rem; max-width: 700px; }
+    .pub-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; 
+                box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: inline-block; }
+    .pub-link { display: inline-block; text-decoration: none; }
+    .pub-img  { width: 220px; height: auto; display: block; border-radius: 8px; }
+    .pub-caption { margin-top: 0.5rem; font-size: 0.85rem; color: #444; max-width: 220px; }
+    .pub-caption a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -69,6 +78,22 @@
     <div class="map-card">
       <svg id="map" viewBox="0 0 700 380" role="img" aria-label="World map highlighting countries"></svg>
       <div class="map-caption">Countries with cases are highlighted.</div>
+    </div>
+  </div>
+
+  <!-- 5) Publication teaser (small visual under the map) -->
+  <div class="pub-wrap">
+    <div class="pub-card">
+      <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/" target="_blank" rel="noopener">
+        <img
+          class="pub-img"
+          src="Reinhold%202025%20REZA%20N15%20Candida%20Campaign.png"
+          alt="First joint publication thumbnail (click to open article)"
+        />
+      </a>
+      <div class="pub-caption">
+        First joint publication — click image to open the article on PMC.
+      </div>
     </div>
   </div>
 
@@ -108,15 +133,15 @@
           {year: 'numeric', month: 'short', day: 'numeric'});
         document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
 
-        // ✅ Sort alphabetically by country name (A→Z)
+        // Alphabetical sort by country (A→Z)
         const rows = Object.entries(latest.countries)
           .sort(([aName],[bName]) => aName.localeCompare(bName, undefined, { sensitivity: 'base' }));
 
-        // Calculate total and place ABOVE the table
+        // Total above the table
         const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
         document.getElementById('total').textContent = `Total: ${total.toLocaleString()}`;
 
-        // Render table rows (now alphabetical)
+        // Render table rows
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
         rows.forEach(([c,v],i) => {
@@ -125,7 +150,7 @@
           tbody.appendChild(tr);
         });
 
-        // Map highlights (countries that appear, and have >0)
+        // Map highlights
         const highlights = new Set(
           rows.filter(([,v]) => Number(v) > 0)
               .map(([n]) => DISPLAY_NAME_MAP[n])
