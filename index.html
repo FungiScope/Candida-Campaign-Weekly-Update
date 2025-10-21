@@ -6,7 +6,7 @@
   <title>Candida Campaign Study Weekly Update</title>
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { margin: 2rem; }
+    body { margin: 2rem; color: #111; }
     h1 { margin: 0 0 0.25rem 0; }
     .muted { color: #666; margin-bottom: 1rem; }
 
@@ -36,14 +36,60 @@
     .country.highlight { fill: #0B9DB0; }
     .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
 
-    /* Publication teaser under the map */
-    .pub-wrap { margin-top: 1rem; max-width: 700px; }
-    .pub-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; 
-                box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: inline-block; }
+    /* Row under the map: publication + collaboration */
+    .below-map { display: flex; gap: 12px; max-width: 700px; margin-top: 12px; align-items: stretch; }
+    .pub-card, .collab-card {
+      padding: 0.75rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05); background: #fff;
+    }
+    .pub-card { width: 230px; flex: 0 0 230px; display: flex; flex-direction: column; }
     .pub-link { display: inline-block; text-decoration: none; }
-    .pub-img  { width: 220px; height: auto; display: block; border-radius: 8px; }
-    .pub-caption { margin-top: 0.5rem; font-size: 0.85rem; color: #444; max-width: 220px; }
-    .pub-caption a { color: inherit; text-decoration: underline; }
+    .pub-img  { width: 100%; height: auto; display: block; border-radius: 8px; }
+    .pub-caption { margin-top: 0.5rem; font-size: 0.85rem; color: #444; }
+
+    /* Collaboration CTA card (right side) */
+    .collab-card { flex: 1; display: flex; }
+    .collab-cta {
+      display: block;
+      /* If you add an orange image to the repo root (e.g., collab-orange.jpg), it will be used automatically: */
+      background-image: url("collab-orange.jpg");
+      background-size: cover;
+      background-position: center;
+      /* Fallback orange gradient if the image isn't there: */
+      background-image: linear-gradient(135deg, #ff8a00 0%, #ff6a00 100%);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      width: 100%;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 140px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* If the image exists, layer a subtle gradient for legibility */
+    .collab-cta::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(0deg, rgba(0,0,0,0.18), rgba(0,0,0,0.18));
+      pointer-events: none;
+    }
+    .collab-cta span {
+      position: relative;
+      font-weight: 700;
+      line-height: 1.3;
+      font-size: 1.05rem;
+    }
+
+    /* Responsive: stack on small screens */
+    @media (max-width: 760px) {
+      .below-map { flex-direction: column; }
+      .pub-card { width: 100%; flex: 0 0 auto; }
+    }
   </style>
 </head>
 <body>
@@ -81,8 +127,9 @@
     </div>
   </div>
 
-  <!-- 5) Publication teaser (small visual under the map) -->
-  <div class="pub-wrap">
+  <!-- 5) Publication (left) + Collaboration CTA (right) -->
+  <div class="below-map">
+    <!-- Publication: small visual linking to paper -->
     <div class="pub-card">
       <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/" target="_blank" rel="noopener">
         <img
@@ -94,6 +141,17 @@
       <div class="pub-caption">
         First joint publication — click image to open the article on PMC.
       </div>
+    </div>
+
+    <!-- Collaboration CTA: orange background, opens email with pre-filled message -->
+    <div class="collab-card">
+      <a
+        class="collab-cta"
+        aria-label="Click to email study team to participate"
+        href="mailto:danila.seidel@uk-koeln.de,oliver.cornely@uk-koeln.de?subject=Interested%20in%20participation%20in%20the%20Candida%20Campaign&body=Dear%20Oliver,%20Dear%20Danila,%0A%0AI%20am%20interested%20in%20participating.%20Looking%20forward%20to%20hearing%20from%20you.%0A%0A%5BYour%20Name%5D%0A%5BYour%20affiliation%5D"
+      >
+        <span>For collaboration please click here to send us a message</span>
+      </a>
     </div>
   </div>
 
@@ -124,7 +182,6 @@
 
         if (!Array.isArray(data) || data.length === 0) {
           document.getElementById('subtitle').textContent = 'No data yet.';
-          await drawMap(new Set());
           return;
         }
 
@@ -141,7 +198,7 @@
         const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
         document.getElementById('total').textContent = `Total: ${total.toLocaleString()}`;
 
-        // Render table rows
+        // Table rows
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
         rows.forEach(([c,v],i) => {
@@ -150,7 +207,7 @@
           tbody.appendChild(tr);
         });
 
-        // Map highlights
+        // Draw map highlights (>0)
         const highlights = new Set(
           rows.filter(([,v]) => Number(v) > 0)
               .map(([n]) => DISPLAY_NAME_MAP[n])
