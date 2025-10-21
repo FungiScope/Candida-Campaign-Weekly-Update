@@ -3,133 +3,112 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Candida Campaign Study Weekly Update</title>
+  <title>Candida Campaign - Weekly Update</title>
+
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     body { margin: 2rem; color: #111; }
     h1 { margin: 0 0 0.25rem 0; }
     .muted { color: #666; margin-bottom: 1rem; }
 
-    .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; }
+    .card {
+      padding: 1rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px;
+    }
 
     table { border-collapse: collapse; width: 100%; }
-    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left; }
+    th, td {
+      padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left;
+    }
     th { font-weight: 700; }
     .right { text-align: right; }
 
     .total { margin: 0.5rem 0 0.75rem 0; font-weight: 600; color: #333; }
 
-    .error { margin-top: 1rem; color: #b00020; background: #ffeef0; border: 1px solid #ffcdd2;
-             padding: 0.75rem; border-radius: 8px; max-width: 700px; display:none; }
+    .error {
+      margin-top: 1rem; color: #b00020; background: #ffeef0;
+      border: 1px solid #ffcdd2; padding: 0.75rem;
+      border-radius: 8px; max-width: 700px; display:none;
+    }
 
     /* Logo */
-    .media-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px;
-                  box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; margin-bottom: 1rem; }
+    .media-card {
+      padding: 0.5rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      max-width: 700px; margin-bottom: 1rem;
+    }
     .media-img  { width: 100%; height: auto; display: block; }
 
     /* Map */
     .map-wrap { margin-top: 2rem; max-width: 700px; }
-    .map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+    .map-card {
+      padding: 0.5rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
     #map { width: 100%; height: auto; }
     .country { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 0.5; }
     .country.highlight { fill: #0B9DB0; }
     .map-caption { color: #666; margin-top: 0.5rem; font-size: 0.85rem; }
 
-    /* Row under the map: publication + collaboration */
-    .below-map { display: flex; gap: 12px; max-width: 700px; margin-top: 12px; align-items: stretch; }
-    .pub-card, .collab-card {
-      padding: 0.75rem; border: 1px solid #eee; border-radius: 12px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05); background: #fff;
+    /* Below the map: publication left + key facts right + banner below */
+    .below-map { max-width: 700px; margin-top: 12px; }
+    .below-map-top {
+      display: flex; gap: 12px; align-items: stretch;
     }
-    .pub-card { width: 230px; flex: 0 0 230px; display: flex; flex-direction: column; }
-    .pub-link { display: inline-block; text-decoration: none; }
+
+    .pub-card {
+      flex: 0 0 230px;
+      padding: 0.75rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      background: #fff;
+      display: flex; flex-direction: column;
+    }
+    .pub-link { text-decoration: none; display: inline-block; }
     .pub-img  { width: 100%; height: auto; display: block; border-radius: 8px; }
     .pub-caption { margin-top: 0.5rem; font-size: 0.85rem; color: #444; }
 
-    /* Collaboration card – subtle orange background */
-    .collab-card {
+    .facts-card {
       flex: 1;
-      background: #FFF8F1;            /* very gentle orange */
-      border: 1px solid #FFE6CC;      /* soft orange border */
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      padding: 0.75rem; border: 1px solid #eee; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      background: transparent;
     }
-
-    /* Orange banner CTA at top of the collaboration card */
-    .collab-cta {
-      display: block;
-      /* Optional background photo if you add collab-orange.jpg in repo root */
-      background-image: url("collab-orange.jpg");
-      background-size: cover;
-      background-position: center;
-      /* Fallback orange gradient if the image is missing */
-      background-image: linear-gradient(135deg, #FFA94D 0%, #FF7A3D 100%);
-      color: #fff;
-      text-decoration: none;
-      border-radius: 8px;
-      width: 100%;
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      min-height: 140px;
-      position: relative;
-      overflow: hidden;
-    }
-    .collab-cta::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(0deg, rgba(0,0,0,0.18), rgba(0,0,0,0.18));
-      pointer-events: none;
-    }
-    .collab-cta span {
-      position: relative;
-      font-weight: 700;
-      line-height: 1.3;
-      font-size: 1.05rem;
-    }
-
-    /* Key facts section inside the orange card */
-    .collab-facts {
-      background: #FFF4E6;           /* even lighter orange panel */
-      border: 1px solid #FFE1C2;
-      border-radius: 8px;
-      padding: 12px 14px;
-      color: #5a3d1e;                /* readable brownish text */
-    }
-    .collab-facts h3 {
-      margin: 0 0 6px 0;
-      font-size: 1rem;
-      font-weight: 700;
-    }
-    .facts {
-      margin: 6px 0 0 1.1rem;
-      padding: 0;
-    }
+    .facts-card h3 { margin: 0 0 6px 0; font-size: 1rem; font-weight: 700; }
+    .facts { margin: 6px 0 0 1.1rem; padding: 0; }
     .facts li { margin: 4px 0; }
 
-    /* Responsive: stack on small screens */
+    .collab-banner {
+      display: block;
+      margin-top: 12px;
+      padding: 14px 16px;
+      background: #FFF4E6;             /* light orange */
+      border: 1px solid #FFE1C2;
+      border-radius: 12px;
+      text-align: center;
+      text-decoration: none;
+      color: #5a3d1e;
+      font-weight: 700;
+    }
+    .collab-banner:hover { filter: brightness(0.98); }
+
     @media (max-width: 760px) {
-      .below-map { flex-direction: column; }
-      .pub-card { width: 100%; flex: 0 0 auto; }
+      .below-map-top { flex-direction: column; }
+      .pub-card { flex: 0 0 auto; width: 100%; }
     }
   </style>
 </head>
 <body>
   <!-- 1) LOGO -->
   <div class="media-card">
-    <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg" alt="Candida Campaign visual" class="media-img">
+    <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg"
+         alt="Candida Campaign visual" class="media-img">
   </div>
 
   <!-- 2) TITLE + SUBTITLE -->
   <h1>Candida Campaign Study Weekly Update</h1>
   <div class="muted" id="subtitle">Loading latest week…</div>
 
-  <!-- 3) TOTAL + TABLE (in one card) -->
+  <!-- 3) TOTAL + TABLE -->
   <div class="card">
     <div id="total" class="total">Total: —</div>
     <table id="cases-table" aria-describedby="subtitle">
@@ -149,32 +128,30 @@
   <!-- 4) MAP -->
   <div class="map-wrap">
     <div class="map-card">
-      <svg id="map" viewBox="0 0 700 380" role="img" aria-label="World map highlighting countries"></svg>
+      <svg id="map" viewBox="0 0 700 380"
+           role="img" aria-label="World map highlighting countries"></svg>
       <div class="map-caption">Countries with cases are highlighted.</div>
     </div>
   </div>
 
-  <!-- 5) Publication (left) + Collaboration (right) -->
+  <!-- 5) Publication + Facts + Banner -->
   <div class="below-map">
-    <!-- Publication: small visual linking to paper -->
-    <div class="pub-card">
-      <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/" target="_blank" rel="noopener">
-        <img
-          class="pub-img"
-          src="Reinhold%202025%20REZA%20N15%20Candida%20Campaign.png"
-          alt="First joint publication thumbnail (click to open article)"
-        />
-      </a>
-      <div class="pub-caption">
-        First joint publication — click image to open the article on PMC.
+    <div class="below-map-top">
+      <!-- Publication (left) -->
+      <div class="pub-card">
+        <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/"
+           target="_blank" rel="noopener">
+          <img class="pub-img"
+               src="Reinhold%202025%20REZA%20N15%20Candida%20Campaign.png"
+               alt="First joint publication thumbnail (click to open article)">
+        </a>
+        <div class="pub-caption">
+          First joint publication — click image to open the article on PMC.
+        </div>
       </div>
-    </div>
 
-    <!-- Collaboration: key facts + contact info mail -->
-
-
-      <!-- Key facts panel -->
-      <div class="collab-facts">
+      <!-- Key Facts (right) -->
+      <div class="facts-card">
         <h3>Key facts about the FungiScope® Candida Campaign</h3>
         <ul class="facts">
           <li>Study Period: 2024–2026</li>
@@ -184,16 +161,16 @@
           <li>Clinical isolates: not required</li>
           <li>Compensation: provided for valid cases</li>
         </ul>
-      
-        <a
-        class="collab-cta"
-        aria-label="Click to email study team to participate"
-        href="mailto:danila.seidel@uk-koeln.de,oliver.cornely@uk-koeln.de?subject=Interested%20in%20participation%20in%20the%20Candida%20Campaign&body=Dear%20Oliver,%20Dear%20Danila,%0A%0AI%20am%20interested%20in%20participating.%20Looking%20forward%20to%20hearing%20from%20you.%0A%0A%5BYour%20Name%5D%0A%5BYour%20affiliation%5D"
-      >
-        <span>For collaboration please click here to send us a message</span>
-      </a>
       </div>
     </div>
+
+    <!-- Orange banner below -->
+    <a
+      class="collab-banner"
+      aria-label="Click to email study team to participate"
+      href="mailto:danila.seidel@uk-koeln.de,oliver.cornely@uk-koeln.de?subject=Interested%20in%20participation%20in%20the%20Candida%20Campaign&body=Dear%20Oliver,%20Dear%20Danila,%0A%0AI%20am%20interested%20in%20participating.%20Looking%20forward%20to%20hearing%20from%20you.%0A%0A%5BYour%20Name%5D%0A%5BYour%20affiliation%5D">
+      For collaboration please click here to send us a message
+    </a>
   </div>
 
   <!-- D3 + TopoJSON -->
@@ -227,19 +204,17 @@
         }
 
         const latest = data.sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
-        const dateText = new Date(latest.date + 'T00:00:00').toLocaleDateString(undefined,
-          {year: 'numeric', month: 'short', day: 'numeric'});
+        const dateText = new Date(latest.date + 'T00:00:00')
+          .toLocaleDateString(undefined,{year: 'numeric', month: 'short', day: 'numeric'});
         document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
 
-        // Alphabetical sort by country (A→Z)
+        // Sort alphabetically
         const rows = Object.entries(latest.countries)
-          .sort(([aName],[bName]) => aName.localeCompare(bName, undefined, { sensitivity: 'base' }));
+          .sort(([a],[b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-        // Total above the table
         const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
         document.getElementById('total').textContent = `Total: ${total.toLocaleString()}`;
 
-        // Table rows
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
         rows.forEach(([c,v],i) => {
@@ -248,7 +223,6 @@
           tbody.appendChild(tr);
         });
 
-        // Draw map highlights (>0)
         const highlights = new Set(
           rows.filter(([,v]) => Number(v) > 0)
               .map(([n]) => DISPLAY_NAME_MAP[n])
@@ -274,12 +248,10 @@
       const projection = d3.geoNaturalEarth1().fitSize([width, height], { type: 'Sphere' });
       const path = d3.geoPath(projection);
 
-      // Ocean
       svg.append('path')
         .attr('d', path({ type: 'Sphere' }))
         .attr('fill', '#eef6ff');
 
-      // Countries
       svg.append('g')
         .selectAll('path')
         .data(countries)
@@ -290,9 +262,9 @@
           return highlightNames.has(name) ? 'country highlight' : 'country';
         });
 
-      // Borders
       svg.append('path')
-        .attr('d', d3.geoPath(projection)(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
+        .attr('d', d3.geoPath(projection)(
+          topojson.mesh(world, world.objects.countries, (a, b) => a !== b)))
         .attr('fill', 'none')
         .attr('stroke', '#cfcfcf')
         .attr('stroke-width', 0.4);
