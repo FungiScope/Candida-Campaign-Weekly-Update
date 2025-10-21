@@ -9,15 +9,26 @@
     body { margin: 2rem; }
     h1 { margin: 0 0 0.25rem 0; }
     .muted { color: #666; margin-bottom: 1rem; }
-    table { border-collapse: collapse; width: 100%; max-width: 700px; }
+
+    .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; }
+
+    table { border-collapse: collapse; width: 100%; }
     th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left; }
     th { font-weight: 700; }
     .right { text-align: right; }
-    .card { padding: 1rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; }
-    .footer { margin-top: 0.75rem; font-size: 0.9rem; color: #666; }
-    .error { margin-top: 1rem; color: #b00020; background: #ffeef0; border: 1px solid #ffcdd2; padding: 0.75rem; border-radius: 8px; max-width: 700px; display:none; }
-    .media-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; margin-bottom: 1rem; }
+
+    .total { margin: 0.5rem 0 0.75rem 0; font-weight: 600; color: #333; }
+
+    .error { margin-top: 1rem; color: #b00020; background: #ffeef0; border: 1px solid #ffcdd2;
+             padding: 0.75rem; border-radius: 8px; max-width: 700px; display:none; }
+
+    /* Logo */
+    .media-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px;
+                  box-shadow: 0 1px 4px rgba(0,0,0,0.05); max-width: 700px; margin-bottom: 1rem; }
     .media-img  { width: 100%; height: auto; display: block; }
+
+    /* Map */
     .map-wrap { margin-top: 2rem; max-width: 700px; }
     .map-card { padding: 0.5rem; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
     #map { width: 100%; height: auto; }
@@ -27,7 +38,7 @@
   </style>
 </head>
 <body>
-  <!-- 1) LOGO / IMAGE -->
+  <!-- 1) LOGO -->
   <div class="media-card">
     <img src="Candida_20230801Seidel_FS%20Candida_vs.jpg" alt="Candida Campaign visual" class="media-img">
   </div>
@@ -36,8 +47,9 @@
   <h1>Candida Campaign Study Weekly Update</h1>
   <div class="muted" id="subtitle">Loading latest week…</div>
 
-  <!-- 3) TABLE + 4) TOTAL SUMMARY -->
+  <!-- 3) TOTAL + TABLE (in one card) -->
   <div class="card">
+    <div id="total" class="total">Total: —</div>
     <table id="cases-table" aria-describedby="subtitle">
       <thead>
         <tr>
@@ -48,12 +60,11 @@
       </thead>
       <tbody></tbody>
     </table>
-    <div class="footer" id="footnote"></div>
   </div>
 
   <div id="error" class="error" role="alert"></div>
 
-  <!-- 5) MAP -->
+  <!-- 4) MAP -->
   <div class="map-wrap">
     <div class="map-card">
       <svg id="map" viewBox="0 0 700 380" role="img" aria-label="World map highlighting countries"></svg>
@@ -82,7 +93,6 @@
 
     async function load() {
       try {
-        // Add cache-buster to avoid stale JSON
         const res = await fetch('data/data.json?v=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error(`Failed to fetch data.json (HTTP ${res.status})`);
         const data = await res.json();
@@ -98,7 +108,15 @@
           {year: 'numeric', month: 'short', day: 'numeric'});
         document.getElementById('subtitle').textContent = `Latest update: ${dateText}`;
 
-        const rows = Object.entries(latest.countries).sort(([,a],[,b]) => (b||0)-(a||0));
+        // ✅ Sort alphabetically by country name (A→Z)
+        const rows = Object.entries(latest.countries)
+          .sort(([aName],[bName]) => aName.localeCompare(bName, undefined, { sensitivity: 'base' }));
+
+        // Calculate total and place ABOVE the table
+        const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
+        document.getElementById('total').textContent = `Total: ${total.toLocaleString()}`;
+
+        // Render table rows (now alphabetical)
         const tbody = document.querySelector('#cases-table tbody');
         tbody.innerHTML = '';
         rows.forEach(([c,v],i) => {
@@ -107,11 +125,14 @@
           tbody.appendChild(tr);
         });
 
-        const total = rows.reduce((s,[,n]) => s + (Number(n)||0), 0);
-        document.getElementById('footnote').textContent = `Total: ${total.toLocaleString()}`;
-
-        const highlights = new Set(rows.map(([n]) => DISPLAY_NAME_MAP[n]).filter(Boolean));
+        // Map highlights (countries that appear, and have >0)
+        const highlights = new Set(
+          rows.filter(([,v]) => Number(v) > 0)
+              .map(([n]) => DISPLAY_NAME_MAP[n])
+              .filter(Boolean)
+        );
         await drawMap(highlights);
+
       } catch (e) {
         console.error(e);
         showError(String(e));
