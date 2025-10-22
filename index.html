@@ -25,7 +25,7 @@
   border-collapse: collapse;
   width: 100%;
   max-width: 100%;     /* keep responsive */
-  margin: 0 auto;      /* center it */
+  margin: 0;      /* center it */
   box-sizing: border-box;
 }
 .card table {
@@ -154,48 +154,46 @@ max-width: 700px;
       <div class="map-caption">Countries with cases are highlighted.</div>
     </div>
   </div>
-  <!-- Orange banner For Collaboration -->
-    <a
-      class="collab-banner"
-      aria-label="Click to email study team to participate"
-      href="mailto:danila.seidel@uk-koeln.de,oliver.cornely@uk-koeln.de?subject=Interested%20in%20participation%20in%20the%20Candida%20Campaign&body=Dear%2Candida%20Campaign%20Team,%0A%0AI%20am%20interested%20in%20participating.%20Looking%20forward%20to%20hearing%20from%20you.%0A%0A%5BYour%20Name%5D%0A%5BYour%20affiliation%5D">
-      For collaboration please click here to send us a message
-    </a>
   
-  <!-- 5) Publication + Facts -->
-  <div class="below-map">
-    <div class="below-map-top">
+ <!-- 5) Collaboration banner (full width) + Publication (left) & Key Facts (right) -->
+<div class="below-map">
+  <!-- Full-width banner BELOW the map and ABOVE the two cards -->
+  <a
+    class="collab-banner"
+    aria-label="Click to email study team to participate"
+    href="mailto:danila.seidel@uk-koeln.de,oliver.cornely@uk-koeln.de?subject=Interested%20in%20participation%20in%20the%20Candida%20Campaign&body=Dear%2Candida%20Campaign%20Team,%0A%0AI%20am%20interested%20in%20participating.%20Looking%20forward%20to%20hearing%20from%20you.%0A%0A%5BYour%20Name%5D%0A%5BYour%20affiliation%5D">
+    For collaboration please click here to send us a message
+  </a>
 
-      <!-- Publication (left) -->
-      <div class="pub-card">
-        <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/"
-           target="_blank" rel="noopener">
-          <img class="pub-img"
-               src="Reinhold%202025%20REZA%20N15%20Candida%20Campaign.png"
-               alt="First joint publication thumbnail (click to open article)">
-        </a>
-        <div class="pub-caption">
-          First joint publication — click image to open the article on PMC.
-        </div>
-      </div>
-      
-
-
-      <!-- Key Facts (right) -->
-      <div class="facts-card">
-        <h3>Key facts about the FungiScope® Candida Campaign</h3>
-        <ul class="facts">
-          <li>Study Period: 2024–2026</li>
-          <li>Clinical data collection: retrospective, anonymized data entry</li>
-          <li>Patient population: adult patients with any invasive <em>Candida</em> infections diagnosed in 2024 and after</li>
-          <li>Follow up: 3 months for survivors</li>
-          <li>Clinical isolates: not required</li>
-          <li>Compensation: provided for valid cases</li>
-        </ul>
+  <!-- Two-column row: publication (left) + key facts (right) -->
+  <div class="below-map-top">
+    <!-- Publication (left) -->
+    <div class="pub-card">
+      <a class="pub-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12441757/" target="_blank" rel="noopener">
+        <img class="pub-img"
+             src="Reinhold%202025%20REZA%20N15%20Candida%20Campaign.png"
+             alt="First joint publication thumbnail (click to open article)">
+      </a>
+      <div class="pub-caption">
+        First joint publication — click image to open the article on PMC.
       </div>
     </div>
 
+    <!-- Key Facts (right) -->
+    <div class="facts-card">
+      <h3>Key facts about the FungiScope® Candida Campaign</h3>
+      <ul class="facts">
+        <li>Study Period: 2024–2026</li>
+        <li>Clinical data collection: retrospective, anonymized data entry</li>
+        <li>Patient population: adult patients with any invasive <em>Candida</em> infections diagnosed in 2024 and after</li>
+        <li>Follow up: 3 months for survivors</li>
+        <li>Clinical isolates: not required</li>
+        <li>Compensation: provided for valid cases</li>
+      </ul>
+    </div>
   </div>
+</div>
+
 
   <!-- D3 + TopoJSON -->
   <script src="https://unpkg.com/d3@7"></script>
