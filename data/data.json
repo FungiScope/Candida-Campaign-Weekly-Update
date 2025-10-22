@@ -2,11 +2,12 @@
 {
     "date": "2025-10-10",
     "countries": {
-      "Germany": 664,
-      "Spain": 368,
-      "Italy": 101,
+      "Germany": 692,
+      "Spain": 376,
+      "Italy": 115,
       "UK": 21,
-      "USA": 130
+      "USA": 148,
+      "Austria": 16,
     }
   }
 ]
